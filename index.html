@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>محادثة خاصة</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: "Cairo", sans-serif;
+      background: #f2f2f2;
+      direction: rtl;
+      transition: background 0.3s, color 0.3s;
+    }
+    body.dark {
+      background: #121212;
+      color: #f0f0f0;
+    }
+    .chat-container {
+      max-width: 600px;
+      margin: auto;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: white;
+      position: relative;
+    }
+    body.dark .chat-container {
+      background: #1e1e1e;
+    }
+    .chat-header {
+      padding: 15px;
+      background: #1976d2;
+      color: white;
+      font-size: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .chat-box {
+      flex: 1;
+      padding: 15px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      scroll-behavior: smooth;
+    }
+    .chat-input {
+      display: flex;
+      padding: 10px;
+      border-top: 1px solid #ccc;
+      background: #fff;
+      position: sticky;
+      bottom: 0;
+      z-index: 2;
+      transition: border 0.3s;
+    }
+    body.dark .chat-input {
+      background: #2c2c2c;
+    }
+    .chat-input.typing {
+      border-top: 3px solid #4caf50;
+    }
+    .chat-input input {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+    .chat-input button {
+      margin-right: 10px;
+      padding: 10px 20px;
+      background: #1976d2;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .msg {
+      max-width: 75%;
+      margin-bottom: 10px;
+      display: flex;
+      flex-direction: column;
+    }
+    .mine {
+      align-self: flex-start;
+    }
+    .other {
+      align-self: flex-end;
+    }
+    .bubble {
+      padding: 10px 15px;
+      border-radius: 20px;
+      background: #d1e7ff;
+      word-wrap: break-word;
+      font-size: 16px;
+    }
+    .other .bubble {
+      background: #f8d7da;
+    }
+    .status {
+      font-size: 12px;
+      color: gray;
+      margin-top: 5px;
+    }
+    body.dark .bubble {
+      background: #37474f;
+      color: white;
+    }
+    body.dark .other .bubble {
+      background: #5c4033;
+    }
+    img {
+      max-width: 200px;
+      border-radius: 10px;
+      margin-top: 5px;
+    }
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+</head>
+<body>
+  <div class="chat-container">
+    <div class="chat-header">
+      <span id="header-title">محادثة</span>
+      <div>
+        <span id="typing-status" style="margin-left: 10px; font-size: 14px;"></span>
+        <button onclick="clearChat()">🗑️</button>
+        <button id="toggle-theme">🌙</button>
+      </div>
+    </div>
+    <div class="chat-box" id="chat-box"></div>
+    <div class="chat-input" id="chat-input">
+      <input type="text" id="message" placeholder="اكتب رسالتك هنا..." onkeydown="if(event.key==='Enter')sendMessage()"/>
+      <button id="send-btn" onclick="sendMessage()">إرسال</button>
+    </div>
+  </div>
+  <input type="file" id="imageInput" accept="image/*" style="display: none" onchange="sendImage()" />
+  <script>
+    const currentUser = "salma"; // غير الاسم هنا
+    const otherUser = currentUser === "mahmoud" ? "salma" : "mahmoud";
+    const chatPath = "starko/chat";
+    const msgInput = document.getElementById("message");
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCuP6VscPxkQS5D5z7bCYWXijzaYCdbF2s",
+      authDomain: "starkoscript.firebaseapp.com",
+      databaseURL: "https://starkoscript-default-rtdb.firebaseio.com",
+      projectId: "starkoscript",
+      storageBucket: "starkoscript.appspot.com",
+      messagingSenderId: "381525854892",
+      appId: "1:381525854892:web:xxxxxxxxxxxxx"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    function sendMessage() {
+      const text = msgInput.value.trim();
+      if (text === "") return;
+
+      const messageData = {
+        sender: currentUser,
+        text,
+        timestamp: Date.now(),
+        seen: false,
+        type: "text"
+      };
+
+      database.ref(chatPath).push(messageData);
+      msgInput.value = "";
+      updateTyping(false);
+      updateLastSeen();
+    }
+
+    function sendImage() {
+      const file = document.getElementById("imageInput").files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const messageData = {
+          sender: currentUser,
+          image: e.target.result,
+          timestamp: Date.now(),
+          seen: false,
+          type: "image"
+        };
+        database.ref(chatPath).push(messageData);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function uploadImage() {
+      document.getElementById("imageInput").click();
+    }
+
+    function clearChat() {
+      if (confirm("هل أنت متأكد من حذف جميع الرسائل؟")) {
+        database.ref(chatPath).remove();
+      }
+    }
+
+    database.ref(chatPath).on("child_added", (snapshot) => {
+      const msg = snapshot.val();
+      const msgKey = snapshot.key;
+
+      const wrapper = document.createElement("div");
+      wrapper.className = msg.sender === currentUser ? "msg mine" : "msg other";
+
+      if (msg.type === "text") {
+        const bubble = document.createElement("div");
+        bubble.className = "bubble";
+        bubble.textContent = msg.text;
+        wrapper.appendChild(bubble);
+      } else if (msg.type === "image") {
+        const img = document.createElement("img");
+        img.src = msg.image;
+        wrapper.appendChild(img);
+      }
+
+      const status = document.createElement("div");
+      status.className = "status";
+      if (msg.sender === currentUser) {
+        status.textContent = msg.seen ? "✅ تمت القراءة" : "✔️ مرسلة";
+      } else {
+        markAsSeen(msgKey);
+      }
+
+      wrapper.appendChild(status);
+      document.getElementById("chat-box").appendChild(wrapper);
+      scrollToBottom();
+    });
+
+    function markAsSeen(key) {
+      database.ref(`${chatPath}/${key}`).update({ seen: true });
+    }
+
+    function scrollToBottom() {
+      const chatBox = document.getElementById("chat-box");
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    msgInput.addEventListener("input", () => {
+      const typing = msgInput.value.trim().length > 0;
+      updateTyping(typing);
+      document.getElementById("chat-input").classList.toggle("typing", typing);
+    });
+
+    function updateTyping(isTyping) {
+      database.ref(`starko/typing/${currentUser}`).set(isTyping);
+    }
+
+    database.ref(`starko/typing/${otherUser}`).on("value", (snapshot) => {
+      const typing = snapshot.val();
+      const status = document.getElementById("typing-status");
+      status.textContent = typing ? "يكتب الآن..." : "";
+    });
+
+    document.getElementById("toggle-theme").onclick = () => {
+      document.body.classList.toggle("dark");
+    };
+
+    msgInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") sendMessage();
+    });
+
+    document.getElementById("send-btn").addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      uploadImage();
+    });
+
+    function updateLastSeen() {
+      database.ref(`starko/lastSeen/${currentUser}`).set(Date.now());
+    }
+
+    database.ref(`starko/lastSeen/${otherUser}`).on("value", (snapshot) => {
+      const time = snapshot.val();
+      if (time) {
+        document.getElementById("header-title").textContent = `آخر ظهور: ${timeAgo(new Date(time))}`;
+      }
+    });
+
+    function timeAgo(date) {
+      const now = new Date();
+      const diff = Math.floor((now - date) / 1000);
+      if (diff < 60) return "الآن";
+      if (diff < 3600) return `${Math.floor(diff / 60)} دقيقة`;
+      if (diff < 86400) return `${Math.floor(diff / 3600)} ساعة`;
+      return `${Math.floor(diff / 86400)} يوم`;
+    }
+  </script>
+</body>
+</html>
