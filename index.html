@@ -8,19 +8,20 @@
     body {
       margin: 0;
       font-family: "Cairo", sans-serif;
-      background: #121212;
-      color: #f0f0f0;
+      background: #ece5dd;
       direction: rtl;
       height: 100vh;
       overflow: hidden;
     }
+
     .chat-container {
       display: flex;
       flex-direction: column;
       height: 100vh;
     }
+
     .chat-header {
-      background: #1976d2;
+      background: #075e54;
       color: white;
       padding: 15px;
       font-size: 18px;
@@ -28,76 +29,109 @@
       justify-content: space-between;
       align-items: center;
     }
+
     .chat-box {
       flex: 1;
-      padding: 15px;
+      padding: 10px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
       scroll-behavior: smooth;
     }
+
     .chat-input {
       display: flex;
+      align-items: center;
       padding: 10px;
-      border-top: 1px solid #444;
-      background: #1e1e1e;
+      background: #f0f0f0;
+      border-top: 1px solid #ccc;
       position: sticky;
       bottom: 0;
       z-index: 10;
     }
+
     .chat-input input {
       flex: 1;
       padding: 10px;
       font-size: 16px;
-      border-radius: 8px;
+      border-radius: 20px;
       border: none;
       outline: none;
-      background: #333;
-      color: white;
+      background: white;
+      margin: 0 5px;
     }
-    .chat-input button {
-      margin-right: 10px;
-      padding: 10px 20px;
-      background: #1976d2;
+
+    .chat-input button, .chat-input label {
+      background: #075e54;
       color: white;
       border: none;
-      border-radius: 8px;
+      padding: 10px 15px;
+      border-radius: 50%;
       cursor: pointer;
+      font-size: 16px;
     }
+
+    .chat-input label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
     .msg {
-      max-width: 75%;
+      max-width: 80%;
       margin-bottom: 10px;
       display: flex;
       flex-direction: column;
     }
+
     .mine {
       align-self: flex-start;
+      align-items: flex-start;
     }
+
     .other {
       align-self: flex-end;
+      align-items: flex-end;
     }
+
     .bubble {
       padding: 10px 15px;
-      border-radius: 20px;
-      background: #37474f;
-      color: white;
-      word-wrap: break-word;
+      border-radius: 15px 15px 0 15px;
+      background: #dcf8c6;
+      color: #111;
       font-size: 16px;
+      word-wrap: break-word;
+      position: relative;
     }
+
     .other .bubble {
-      background: #5c4033;
+      background: white;
+      border-radius: 15px 15px 15px 0;
     }
+
     .status {
       font-size: 12px;
-      color: gray;
-      margin-top: 5px;
+      color: #888;
+      margin-top: 3px;
     }
+
     img {
       max-width: 200px;
       border-radius: 10px;
       margin-top: 5px;
     }
+
+    @media (max-width: 600px) {
+      .bubble {
+        font-size: 15px;
+      }
+
+      .chat-input input {
+        font-size: 14px;
+      }
+    }
   </style>
+
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 </head>
@@ -105,18 +139,19 @@
   <div class="chat-container">
     <div class="chat-header">
       <span>محادثة</span>
-      <span id="header-status">جاري التحميل...</span>
+      <span id="header-status">جارٍ التحميل...</span>
     </div>
     <div class="chat-box" id="chat-box"></div>
     <div class="chat-input">
-      <input type="text" id="message" placeholder="اكتب رسالتك هنا..." />
-      <button onclick="sendMessage()">إرسال</button>
+      <label for="imageInput">📎</label>
+      <input type="text" id="message" placeholder="اكتب رسالة..." />
+      <button onclick="sendMessage()">➤</button>
     </div>
   </div>
   <input type="file" id="imageInput" accept="image/*" style="display: none" onchange="sendImage()" />
 
   <script>
-    const currentUser = "salma"; // غيّر الاسم حسب الطرف الحالي
+    const currentUser = "salma"; // غيره حسب المستخدم الحالي
     const otherUser = currentUser === "mahmoud" ? "salma" : "mahmoud";
     const chatPath = "starko/chat";
     const msgInput = document.getElementById("message");
@@ -131,6 +166,7 @@
       messagingSenderId: "381525854892",
       appId: "1:381525854892:web:xxxxxxxxxxxxx"
     };
+
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
 
@@ -167,10 +203,6 @@
       reader.readAsDataURL(file);
     }
 
-    function uploadImage() {
-      document.getElementById("imageInput").click();
-    }
-
     database.ref(chatPath).on("child_added", (snapshot) => {
       const msg = snapshot.val();
       const msgKey = snapshot.key;
@@ -191,10 +223,15 @@
 
       const status = document.createElement("div");
       status.className = "status";
+
+      const time = new Date(msg.timestamp);
+      const formattedTime = time.toLocaleTimeString("ar-EG", { hour: '2-digit', minute: '2-digit' });
+
       if (msg.sender === currentUser) {
-        status.textContent = msg.seen ? "✅ تمت القراءة" : "✔️ مرسلة";
+        status.textContent = msg.seen ? `✅ تمت القراءة • ${formattedTime}` : `✔️ مرسلة • ${formattedTime}`;
       } else {
         markAsSeen(msgKey);
+        status.textContent = `${formattedTime}`;
       }
       wrapper.appendChild(status);
 
@@ -226,11 +263,6 @@
 
     msgInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") sendMessage();
-    });
-
-    document.querySelector("button").addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-      uploadImage();
     });
 
     function updateTyping(isTyping) {
