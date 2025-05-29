@@ -3,35 +3,26 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>محادثة خاصة</title>
+  <title>محادثة</title>
   <style>
     body {
       margin: 0;
       font-family: "Cairo", sans-serif;
-      background: #f2f2f2;
-      direction: rtl;
-      transition: background 0.3s, color 0.3s;
-    }
-    body.dark {
       background: #121212;
       color: #f0f0f0;
+      direction: rtl;
+      height: 100vh;
+      overflow: hidden;
     }
     .chat-container {
-      max-width: 600px;
-      margin: auto;
-      height: 100vh;
       display: flex;
       flex-direction: column;
-      background: white;
-      position: relative;
-    }
-    body.dark .chat-container {
-      background: #1e1e1e;
+      height: 100vh;
     }
     .chat-header {
-      padding: 15px;
       background: #1976d2;
       color: white;
+      padding: 15px;
       font-size: 18px;
       display: flex;
       justify-content: space-between;
@@ -48,25 +39,21 @@
     .chat-input {
       display: flex;
       padding: 10px;
-      border-top: 1px solid #ccc;
-      background: #fff;
+      border-top: 1px solid #444;
+      background: #1e1e1e;
       position: sticky;
       bottom: 0;
-      z-index: 2;
-      transition: border 0.3s;
-    }
-    body.dark .chat-input {
-      background: #2c2c2c;
-    }
-    .chat-input.typing {
-      border-top: 3px solid #4caf50;
+      z-index: 10;
     }
     .chat-input input {
       flex: 1;
       padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
       font-size: 16px;
+      border-radius: 8px;
+      border: none;
+      outline: none;
+      background: #333;
+      color: white;
     }
     .chat-input button {
       margin-right: 10px;
@@ -92,24 +79,18 @@
     .bubble {
       padding: 10px 15px;
       border-radius: 20px;
-      background: #d1e7ff;
+      background: #37474f;
+      color: white;
       word-wrap: break-word;
       font-size: 16px;
     }
     .other .bubble {
-      background: #f8d7da;
+      background: #5c4033;
     }
     .status {
       font-size: 12px;
       color: gray;
       margin-top: 5px;
-    }
-    body.dark .bubble {
-      background: #37474f;
-      color: white;
-    }
-    body.dark .other .bubble {
-      background: #5c4033;
     }
     img {
       max-width: 200px;
@@ -123,25 +104,23 @@
 <body>
   <div class="chat-container">
     <div class="chat-header">
-      <span id="header-title">محادثة</span>
-      <div>
-        <span id="typing-status" style="margin-left: 10px; font-size: 14px;"></span>
-        <button onclick="clearChat()">🗑️</button>
-        <button id="toggle-theme">🌙</button>
-      </div>
+      <span>محادثة</span>
+      <span id="header-status">جاري التحميل...</span>
     </div>
     <div class="chat-box" id="chat-box"></div>
-    <div class="chat-input" id="chat-input">
-      <input type="text" id="message" placeholder="اكتب رسالتك هنا..." onkeydown="if(event.key==='Enter')sendMessage()"/>
-      <button id="send-btn" onclick="sendMessage()">إرسال</button>
+    <div class="chat-input">
+      <input type="text" id="message" placeholder="اكتب رسالتك هنا..." />
+      <button onclick="sendMessage()">إرسال</button>
     </div>
   </div>
   <input type="file" id="imageInput" accept="image/*" style="display: none" onchange="sendImage()" />
+
   <script>
-    const currentUser = "salma"; // غير الاسم هنا
+    const currentUser = "salma"; // غيّر الاسم حسب الطرف الحالي
     const otherUser = currentUser === "mahmoud" ? "salma" : "mahmoud";
     const chatPath = "starko/chat";
     const msgInput = document.getElementById("message");
+    const chatBox = document.getElementById("chat-box");
 
     const firebaseConfig = {
       apiKey: "AIzaSyCuP6VscPxkQS5D5z7bCYWXijzaYCdbF2s",
@@ -157,8 +136,7 @@
 
     function sendMessage() {
       const text = msgInput.value.trim();
-      if (text === "") return;
-
+      if (!text) return;
       const messageData = {
         sender: currentUser,
         text,
@@ -166,7 +144,6 @@
         seen: false,
         type: "text"
       };
-
       database.ref(chatPath).push(messageData);
       msgInput.value = "";
       updateTyping(false);
@@ -194,18 +171,12 @@
       document.getElementById("imageInput").click();
     }
 
-    function clearChat() {
-      if (confirm("هل أنت متأكد من حذف جميع الرسائل؟")) {
-        database.ref(chatPath).remove();
-      }
-    }
-
     database.ref(chatPath).on("child_added", (snapshot) => {
       const msg = snapshot.val();
       const msgKey = snapshot.key;
-
       const wrapper = document.createElement("div");
       wrapper.className = msg.sender === currentUser ? "msg mine" : "msg other";
+      wrapper.dataset.key = msgKey;
 
       if (msg.type === "text") {
         const bubble = document.createElement("div");
@@ -225,9 +196,19 @@
       } else {
         markAsSeen(msgKey);
       }
-
       wrapper.appendChild(status);
-      document.getElementById("chat-box").appendChild(wrapper);
+
+      if (msg.sender === currentUser) {
+        wrapper.addEventListener("contextmenu", (e) => {
+          e.preventDefault();
+          if (confirm("هل تريد حذف هذه الرسالة؟")) {
+            database.ref(`${chatPath}/${msgKey}`).remove();
+            wrapper.remove();
+          }
+        });
+      }
+
+      chatBox.appendChild(wrapper);
       scrollToBottom();
     });
 
@@ -236,47 +217,41 @@
     }
 
     function scrollToBottom() {
-      const chatBox = document.getElementById("chat-box");
       chatBox.scrollTop = chatBox.scrollHeight;
     }
 
     msgInput.addEventListener("input", () => {
-      const typing = msgInput.value.trim().length > 0;
-      updateTyping(typing);
-      document.getElementById("chat-input").classList.toggle("typing", typing);
+      updateTyping(msgInput.value.trim().length > 0);
+    });
+
+    msgInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") sendMessage();
+    });
+
+    document.querySelector("button").addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      uploadImage();
     });
 
     function updateTyping(isTyping) {
       database.ref(`starko/typing/${currentUser}`).set(isTyping);
     }
 
-    database.ref(`starko/typing/${otherUser}`).on("value", (snapshot) => {
-      const typing = snapshot.val();
-      const status = document.getElementById("typing-status");
-      status.textContent = typing ? "يكتب الآن..." : "";
-    });
-
-    document.getElementById("toggle-theme").onclick = () => {
-      document.body.classList.toggle("dark");
-    };
-
-    msgInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") sendMessage();
-    });
-
-    document.getElementById("send-btn").addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-      uploadImage();
-    });
-
     function updateLastSeen() {
       database.ref(`starko/lastSeen/${currentUser}`).set(Date.now());
     }
 
+    setInterval(updateLastSeen, 30000);
+
     database.ref(`starko/lastSeen/${otherUser}`).on("value", (snapshot) => {
       const time = snapshot.val();
-      if (time) {
-        document.getElementById("header-title").textContent = `آخر ظهور: ${timeAgo(new Date(time))}`;
+      const status = document.getElementById("header-status");
+      if (!time) return status.textContent = "";
+      const now = Date.now();
+      if (now - time < 60000) {
+        status.textContent = "متصل الآن";
+      } else {
+        status.textContent = "آخر ظهور: " + timeAgo(new Date(time));
       }
     });
 
